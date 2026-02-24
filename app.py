@@ -2,17 +2,8 @@ import json
 from typing import Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
-#from transformers import pipeline
 
 app = FastAPI(title="AI Lead Scoring API (Local Model)")
-
-# Load model once at startup
-#classifier = pipeline(
- #   "zero-shot-classification",
-  #  model="facebook/bart-large-mnli",
-   # framework="pt"  # Force PyTorch
-#)
-
 
 class Lead(BaseModel):
     name: str
@@ -24,23 +15,27 @@ class Lead(BaseModel):
 def analyze_lead(message: str, budget: Optional[str]):
 
     text = message.lower()
-
     score = 0
+    reasons = []
 
     # Urgency keywords
     urgent_words = ["urgent", "immediately", "asap", "today", "ready"]
     if any(word in text for word in urgent_words):
         score += 30
+        reasons.append("Urgency detected")
 
     # Buying intent keywords
     intent_words = ["need", "buy", "purchase", "looking for", "interested"]
     if any(word in text for word in intent_words):
         score += 30
+        reasons.append("Buying intent detected")
 
     # Budget check
     if budget:
-        if "cr" in budget.lower() or "lakh" in budget.lower():
+        budget_text = budget.lower()
+        if "cr" in budget_text or "lakh" in budget_text:
             score += 30
+            reasons.append("Budget mentioned")
 
     score = min(score, 100)
 
@@ -54,11 +49,14 @@ def analyze_lead(message: str, budget: Optional[str]):
         category = "COLD"
         urgency = "Low"
 
+    if not reasons:
+        reasons.append("Low engagement or unclear buying signals")
+
     return {
         "intent_score": score,
         "urgency": urgency,
         "category": category,
-        "reason": "Keyword-based intelligent scoring"
+        "reason": ", ".join(reasons)
     }
 
 
