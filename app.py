@@ -2,16 +2,16 @@ import json
 from typing import Optional
 from fastapi import FastAPI
 from pydantic import BaseModel
-from transformers import pipeline
+#from transformers import pipeline
 
 app = FastAPI(title="AI Lead Scoring API (Local Model)")
 
 # Load model once at startup
-classifier = pipeline(
-    "zero-shot-classification",
-    model="facebook/bart-large-mnli",
-    framework="pt"  # Force PyTorch
-)
+#classifier = pipeline(
+ #   "zero-shot-classification",
+  #  model="facebook/bart-large-mnli",
+   # framework="pt"  # Force PyTorch
+#)
 
 
 class Lead(BaseModel):
@@ -23,46 +23,42 @@ class Lead(BaseModel):
 
 def analyze_lead(message: str, budget: Optional[str]):
 
-    labels = ["high buying intent", "medium buying intent", "low buying intent"]
+    text = message.lower()
 
-    full_text = f"{message}. Budget: {budget}"
+    score = 0
 
-    result = classifier(full_text, candidate_labels=labels)
+    # Urgency keywords
+    urgent_words = ["urgent", "immediately", "asap", "today", "ready"]
+    if any(word in text for word in urgent_words):
+        score += 30
 
-    top_label = result["labels"][0]
-    score = float(result["scores"][0])
+    # Buying intent keywords
+    intent_words = ["need", "buy", "purchase", "looking for", "interested"]
+    if any(word in text for word in intent_words):
+        score += 30
 
-    intent_score = int(score * 100)
+    # Budget check
+    if budget:
+        if "cr" in budget.lower() or "lakh" in budget.lower():
+            score += 30
 
-    # Add keyword-based boosting
-    urgent_keywords = ["urgent", "immediately", "asap", "ready to buy"]
-    high_budget_keywords = ["cr", "lakh", "million"]
+    score = min(score, 100)
 
-    boost = 0
-
-    if any(word in message.lower() for word in urgent_keywords):
-        boost += 15
-
-    if budget and any(word in budget.lower() for word in high_budget_keywords):
-        boost += 15
-
-    intent_score = min(intent_score + boost, 100)
-
-    if intent_score >= 75:
-        urgency = "High"
+    if score >= 70:
         category = "HOT"
-    elif intent_score >= 50:
-        urgency = "Medium"
+        urgency = "High"
+    elif score >= 40:
         category = "WARM"
+        urgency = "Medium"
     else:
-        urgency = "Low"
         category = "COLD"
+        urgency = "Low"
 
     return {
-        "intent_score": intent_score,
+        "intent_score": score,
         "urgency": urgency,
         "category": category,
-        "reason": f"Detected as {top_label} with keyword boost"
+        "reason": "Keyword-based intelligent scoring"
     }
 
 
